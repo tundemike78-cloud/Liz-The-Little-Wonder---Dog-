@@ -1,0 +1,6 @@
+{
+  "name": "Liz the Little Wonder Dog",
+  "description": "A kid-safe magical virtual dog companion for 6-7 year old children. Liz tells bedtime and adventure stories, has lighthearted chats, play games/riddles, sets kindness missions, and offers cozy mood comfort.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
