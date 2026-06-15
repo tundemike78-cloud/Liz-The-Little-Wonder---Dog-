@@ -78,3 +78,18 @@ export interface Friend {
   receivedGiftsCount: number;
   missionJoined?: boolean;
 }
+
+export interface ScrapbookEntry {
+  id: string;
+  title: string;
+  type: "snapshot" | "story" | "drawing" | "milestone" | "audio" | "kindness";
+  date: string;
+  caption: string;
+  emoji: string;
+  bgColor: string;
+  heartsCount: number;
+  stickers: string[];
+  drawingData?: string;
+  storyText?: string;
+}
+

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Sparkles, 
@@ -18,6 +18,7 @@ import {
   RotateCcw, 
   Award,
   ChevronRight,
+  ChevronLeft,
   LogOut,
   Info,
   Sliders,
@@ -30,7 +31,14 @@ import {
   X,
   CheckCircle2,
   Users,
-  UserPlus
+  UserPlus,
+  Heart,
+  Camera,
+  Plus,
+  Trash2,
+  Palette,
+  Music,
+  Star
 } from "lucide-react";
 import { 
   Message, 
@@ -43,7 +51,8 @@ import {
   LizDressUp, 
   MiniGameType, 
   AnimalRiddle,
-  Friend
+  Friend,
+  ScrapbookEntry
 } from "./types";
 import LizAvatar from "./components/LizAvatar";
 
@@ -91,7 +100,7 @@ const PRESET_MESSAGES = [
 
 export default function App() {
   // Primary Navigation
-  const [activeTab, setActiveTab] = useState<"home" | "chat" | "story" | "game" | "mood" | "voice" | "friends">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "chat" | "story" | "game" | "mood" | "voice" | "friends" | "scrapbook">("home");
 
   // Friends & Puppies States
   const [friends, setFriends] = useState<Friend[]>(() => {
@@ -224,6 +233,163 @@ export default function App() {
     }
   ]);
   const [viewingSavedStory, setViewingSavedStory] = useState<{ id: string; title: string; text: string } | null>(null);
+
+  // --- Liz's Memory Scrapbook / Keepsake States & Logic ---
+  const [scrapbookEntries, setScrapbookEntries] = useState<ScrapbookEntry[]>(() => {
+    const stored = localStorage.getItem("liz_scrapbook_entries");
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {}
+    }
+    return [
+      {
+        id: "mem-1",
+        title: "Our First Day Together! 🌸",
+        type: "snapshot" as const,
+        date: "June 12, 2026",
+        caption: "We became best friends forever! Liz's tail was wagging so fast it made a happy breeze! Woof! *super big puppy hug*",
+        emoji: "🐶💖",
+        bgColor: "from-pink-50 via-rose-50 to-pink-100",
+        heartsCount: 8,
+        stickers: ["✨", "💖", "🐾"]
+      },
+      {
+        id: "mem-2",
+        title: "Super Sparkly Bakers! 🥯",
+        type: "milestone" as const,
+        date: "June 13, 2026",
+        caption: "We kneaded and baked an amazing star shaped treat with delicious honey clover! Liz rated it 100/10 yummy bones!",
+        emoji: "🍪🧁",
+        bgColor: "from-amber-50 via-yellow-50 to-orange-100",
+        heartsCount: 5,
+        stickers: ["⭐", "🔥", "😋"]
+      },
+      {
+        id: "mem-3",
+        title: "Our Royal Dress Up 👑",
+        type: "snapshot" as const,
+        date: "June 14, 2026",
+        caption: "Liz put on the Princess Golden Crown and starry wizard cape! Liz looked so majestic like the queen of puppy castle!",
+        emoji: "🐕✨",
+        bgColor: "from-violet-50 via-purple-50 to-indigo-100",
+        heartsCount: 12,
+        stickers: ["👑", "✨", "❤️"]
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("liz_scrapbook_entries", JSON.stringify(scrapbookEntries));
+  }, [scrapbookEntries]);
+
+  const [currentScrapbookPage, setCurrentScrapbookPage] = useState<number>(0);
+  const [showStickerPicker, setShowStickerPicker] = useState<boolean>(false);
+  const [newMemoryTitle, setNewMemoryTitle] = useState("");
+  const [newMemoryCaption, setNewMemoryCaption] = useState("");
+  const [newMemoryEmoji, setNewMemoryEmoji] = useState("🌸");
+  const [newMemoryBg, setNewMemoryBg] = useState("from-pink-50 via-rose-50 to-pink-100");
+  const [scrapbookTabActive, setScrapbookTabActive] = useState<"book" | "doodle" | "parent">("book");
+
+  // Doodle Pad variables
+  const doodleCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [doodleColor, setDoodleColor] = useState("#ec4899");
+  const [doodleLineWidth, setDoodleLineWidth] = useState(6);
+  const [isDoodling, setIsDoodling] = useState(false);
+
+  const addMemoryToScrapbook = (
+    title: string, 
+    type: "snapshot" | "story" | "drawing" | "milestone" | "audio" | "kindness", 
+    caption: string, 
+    emoji: string, 
+    bgColor: string, 
+    drawingData?: string, 
+    storyText?: string
+  ) => {
+    const newEntry: ScrapbookEntry = {
+      id: "mem-" + Date.now(),
+      title,
+      type,
+      date: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+      caption,
+      emoji,
+      bgColor,
+      heartsCount: 0,
+      stickers: [],
+      drawingData,
+      storyText
+    };
+    setScrapbookEntries(prev => [newEntry, ...prev]);
+  };
+
+  // Drawing Canvas Functions
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = doodleCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.strokeStyle = doodleColor;
+    ctx.lineWidth = doodleLineWidth;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    // Support mouse and touch event offsets
+    let x = 0;
+    let y = 0;
+    if ("touches" in e) {
+      if (e.touches.length === 0) return;
+      const rect = canvas.getBoundingClientRect();
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.nativeEvent.offsetX;
+      y = e.nativeEvent.offsetY;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDoodling(true);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDoodling) return;
+    const canvas = doodleCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let x = 0;
+    let y = 0;
+    if ("touches" in e) {
+      if (e.touches.length === 0) return;
+      const rect = canvas.getBoundingClientRect();
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+      // Prevent browser bounce scrolling on tablet
+      try {
+        e.preventDefault();
+      } catch (err) {}
+    } else {
+      x = e.nativeEvent.offsetX;
+      y = e.nativeEvent.offsetY;
+    }
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDoodling(false);
+  };
+
+  const clearDoodleCanvas = () => {
+    const canvas = doodleCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
 
   // Game configuration states
   const [activeGame, setActiveGame] = useState<MiniGameType>(null);
@@ -711,6 +877,18 @@ export default function App() {
         text: textResult
       };
       setSavedStories(prev => [newSaved, ...prev]);
+      
+      // Auto-add to scrapbooks
+      addMemoryToScrapbook(
+        `Story: ${formattedTitle.replace("✨", "").slice(0, 20)} 📖`,
+        "story",
+        `We created an amazing ${type} story about our adventures! It is filled with magical wonder and golden lessons.`,
+        "📖✨",
+        "from-violet-50 to-indigo-100",
+        undefined,
+        textResult
+      );
+
       speakVoice(textResult.slice(0, 200) + "... Sleep tight!");
 
     } catch (error) {
@@ -722,6 +900,16 @@ export default function App() {
         storyText: fallbackText,
         isLoading: false
       }));
+
+      addMemoryToScrapbook(
+        "Strawberry Balloon Ride! 🎈🍓",
+        "story",
+        "We took a magical balloon ride above strawberry hills! The forest animals all waved their paws at us with big hugs!",
+        "🎈🐶",
+        "from-pink-50 to-orange-100",
+        undefined,
+        fallbackText
+      );
     }
   };
 
@@ -2482,6 +2670,525 @@ export default function App() {
               </div>
             )}
 
+            {/* TAB VIEW 6: LIZ'S KEEPSAKE SCRAPBOOK (Pink gradient theme) */}
+            {activeTab === "scrapbook" && (
+              <div id="scrapbook-playground-pane" className="bg-white/95 rounded-3xl p-5 border-2 border-pink-300 mb-4 animate-fade-in text-xs font-bold shadow-md w-full relative z-10">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4 pb-2 border-b border-pink-100">
+                  <span className="text-pink-700 font-extrabold flex items-center gap-1.5 text-sm">
+                    🎨📖 Liz & Elizabeth's Memory Book
+                  </span>
+                  <button 
+                    type="button"
+                    onClick={() => setActiveTab("home")} 
+                    className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 cursor-pointer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <p className="text-gray-500 text-[10.5px] leading-relaxed text-center mb-4 font-semibold">
+                  🌸 Best friends log their childhood secrets and adventures together! Tappily flip pages below!
+                </p>
+
+                {/* Sub-navigation inside Scrapbook */}
+                <div className="flex gap-2 justify-center mb-5 font-sans">
+                  <button
+                    type="button"
+                    onClick={() => setScrapbookTabActive("book")}
+                    className={`px-3 py-1.5 rounded-xl text-[10.5px] font-black cursor-pointer transition-all ${scrapbookTabActive === "book" ? 'bg-pink-500 text-white shadow-sm font-black' : 'bg-gray-100 text-gray-600 hover:bg-pink-50 font-bold'}`}
+                  >
+                    📔 View Scrapbook
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScrapbookTabActive("doodle")}
+                    className={`px-3 py-1.5 rounded-xl text-[10.5px] font-black cursor-pointer transition-all ${scrapbookTabActive === "doodle" ? 'bg-pink-500 text-white shadow-sm font-black' : 'bg-gray-100 text-gray-600 hover:bg-pink-50 font-bold'}`}
+                  >
+                    🎨 Magical Doodle Pad
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScrapbookTabActive("parent");
+                      setNewMemoryTitle("");
+                      setNewMemoryCaption("");
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-[10.5px] font-black cursor-pointer transition-all ${scrapbookTabActive === "parent" ? 'bg-pink-500 text-white shadow-sm font-black' : 'bg-gray-100 text-gray-600 hover:bg-pink-50 font-bold'}`}
+                  >
+                    ✍️ Log a Milestone
+                  </button>
+                </div>
+
+                {/* SUBTAB 1: VIEW SCRAPBOOK COVERS/PAGES */}
+                {scrapbookTabActive === "book" && (
+                  <div className="space-y-4">
+                    {scrapbookEntries.length === 0 ? (
+                      <div className="text-center py-8 bg-pink-50/25 border border-dashed border-pink-200 rounded-3xl px-4">
+                        <span className="text-4xl">🐕📖</span>
+                        <h4 className="text-pink-850 font-black text-xs mt-2">A Brand New Keepsake Box!</h4>
+                        <p className="text-gray-400 text-[10px] max-w-[260px] mx-auto mt-1 leading-normal font-semibold">
+                          Oops! Our book is fresh and empty. Cook dynamic dinners, solve puzzles, generate new stories, or draw inside the magic art studio to automatically paste cozy polaroids here!
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {/* The Book Stage */}
+                        <div className="relative bg-amber-50/15 border-2 border-amber-200 p-4 rounded-3xl shadow-inner overflow-hidden flex flex-col items-center">
+                          {/* Wood bindings styling background decor */}
+                          <div className="absolute top-0 bottom-0 left-2 w-1.5 bg-amber-900/10 border-r border-amber-950/20" />
+                          <div className="absolute top-0 bottom-0 left-[18px] w-0.5 bg-amber-900/10" />
+
+                          {/* Polaroid page container */}
+                          <motion.div
+                            key={currentScrapbookPage}
+                            initial={{ rotate: -2, scale: 0.95, opacity: 0 }}
+                            animate={{ rotate: 1, scale: 1, opacity: 1 }}
+                            transition={{ duration: 0.4 }}
+                            className={`w-full max-w-[290px] bg-white border-2 border-gray-150 p-3 pb-5 rounded-md shadow-lg flex flex-col relative bg-gradient-to-b ${scrapbookEntries[currentScrapbookPage].bgColor}`}
+                          >
+                            {/* Polaroid photo box */}
+                            <div className="w-full aspect-square rounded-lg bg-white border shadow-inner overflow-hidden flex items-center justify-center relative p-1">
+                              {scrapbookEntries[currentScrapbookPage].drawingData ? (
+                                <img
+                                  src={scrapbookEntries[currentScrapbookPage].drawingData}
+                                  alt="doodle"
+                                  className="w-full h-full object-contain rounded"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="text-center max-w-[90%] pointer-events-none select-none">
+                                  <span className="text-6xl drop-shadow-md block mb-1">
+                                    {scrapbookEntries[currentScrapbookPage].emoji}
+                                  </span>
+                                  {scrapbookEntries[currentScrapbookPage].storyText && (
+                                    <span className="text-[8.5px] text-gray-400 uppercase tracking-widest font-extrabold bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded border border-violet-200">
+                                      📜 Fairy Tale Book
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Stuck stickers list cluster */}
+                              {scrapbookEntries[currentScrapbookPage].stickers.map((stk, sIdx) => {
+                                const rot = (sIdx * 25) % 360;
+                                const left = 10 + (sIdx * 22) % 70;
+                                const top = 10 + (sIdx * 33) % 70;
+                                return (
+                                  <motion.span
+                                    key={sIdx}
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1.5 }}
+                                    className="absolute text-xl select-none filter drop-shadow z-10"
+                                    style={{ 
+                                      left: `${left}%`, 
+                                      top: `${top}%`, 
+                                      transform: `rotate(${rot}deg)` 
+                                    }}
+                                  >
+                                    {stk}
+                                  </motion.span>
+                                );
+                              })}
+                            </div>
+
+                            {/* Caption of Polaroid */}
+                            <div className="mt-3 text-left font-sans text-gray-700 space-y-1">
+                              <div className="flex justify-between items-start">
+                                <span className="text-[10px] text-gray-400 font-extrabold block lowercase tracking-tight">
+                                  📅 {scrapbookEntries[currentScrapbookPage].date}
+                                </span>
+                                <span className="text-[9.5px] text-pink-500 font-extrabold block">
+                                  ❤️ {scrapbookEntries[currentScrapbookPage].heartsCount || 0} Hearts
+                                </span>
+                              </div>
+                              <h3 className="text-amber-950 font-black text-xs leading-none tracking-tight leading-normal">
+                                {scrapbookEntries[currentScrapbookPage].title}
+                              </h3>
+                              <p className="text-[10.5px] text-gray-600 italic font-bold leading-relaxed pt-1 select-none border-t border-gray-100/50 mt-1">
+                                "{scrapbookEntries[currentScrapbookPage].caption}"
+                              </p>
+
+                              {/* Story scrollable summary detail if present */}
+                              {scrapbookEntries[currentScrapbookPage].storyText && (
+                                <div className="mt-2 p-1.5 bg-white/70 rounded-lg text-[9.5px] text-gray-500 font-medium overflow-y-auto max-h-[80px] border border-dashed border-gray-200">
+                                  <p className="leading-normal">{scrapbookEntries[currentScrapbookPage].storyText}</p>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+
+                          {/* Hearts Button & Sticker Palette triggers */}
+                          <div className="mt-3 flex gap-2 w-full max-w-[290px] justify-between font-sans">
+                            {/* Tap Heart action */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScrapbookEntries(prev => prev.map((entry, idx) => {
+                                  if (idx === currentScrapbookPage) {
+                                    return { ...entry, heartsCount: (entry.heartsCount || 0) + 1 };
+                                  }
+                                  return entry;
+                                }));
+                                speakVoice("Oh my biscuits! I love you Elizabeth! High Paw! *happy barks and wags*");
+                              }}
+                              className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white font-extrabold rounded-xl text-[10px] active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer shadow-sm"
+                            >
+                              ❤️ Tap Love Heart (+1)
+                            </button>
+
+                            {/* Place sticker toggle */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowStickerPicker(!showStickerPicker);
+                                speakVoice("Tap a giant shiny sticker to slap it on our polaroid snapshot!");
+                              }}
+                              className={`px-3 py-1.5 border rounded-xl text-[10px] cursor-pointer transition-all ${showStickerPicker ? 'bg-pink-100 text-pink-700 border-pink-400 font-extrabold' : 'bg-white border-gray-200'}`}
+                            >
+                              🎨 Paste Sticker 🐾
+                            </button>
+                            
+                            {/* Delete Page action carefully */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const check = confirm("Elizabeth, want to clean up this memory page from our book?");
+                                if (check) {
+                                  setScrapbookEntries(prev => prev.filter((_, idx) => idx !== currentScrapbookPage));
+                                  setCurrentScrapbookPage(0);
+                                  speakVoice("Poof! That page is cleared from our keepsake book.");
+                                }
+                              }}
+                              className="p-1.5 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-xl transition-colors cursor-pointer border border-gray-200"
+                              title="Delete Memory"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+
+                          {/* Sticker Picker drawer list row */}
+                          {showStickerPicker && (
+                            <motion.div 
+                              initial={{ y: 20, opacity: 0 }}
+                              animate={{ y: 0, opacity: 1 }}
+                              className="mt-3 p-2 bg-pink-50 rounded-xl border border-pink-200 w-full max-w-[290px] text-center"
+                            >
+                              <span className="text-[9px] font-black uppercase text-pink-750 block mb-1">🌸 Select Sticker To Place:</span>
+                              <div className="flex gap-1.5 overflow-x-auto pb-1 justify-start index-scroll">
+                                {["✨", "💖", "🐾", "⭐", "👑", "🔥", "🦄", "🌈", "🍦", "🌙", "🦋", "🎨", "🎉", "🍬"].map(stk => (
+                                  <button
+                                    key={stk}
+                                    type="button"
+                                    onClick={() => {
+                                      setScrapbookEntries(prev => prev.map((entry, idx) => {
+                                        if (idx === currentScrapbookPage) {
+                                          return { ...entry, stickers: [...entry.stickers, stk] };
+                                        }
+                                        return entry;
+                                      }));
+                                      addActivityLog("game", `Placed a ${stk} sticker in memory book`);
+                                      speakVoice(`Oh how lovely! The ${stk} sticker makes our page shine!`);
+                                    }}
+                                    className="text-2xl hover:scale-125 transition-transform p-3 bg-white rounded-lg border border-pink-100 cursor-pointer flex-shrink-0"
+                                  >
+                                    {stk}
+                                  </button>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </div>
+
+                        {/* Page turning controls footer */}
+                        <div className="flex items-center justify-between px-2 pt-1 font-bold">
+                          <button
+                            type="button"
+                            disabled={currentScrapbookPage === 0}
+                            onClick={() => {
+                              setCurrentScrapbookPage(p => p - 1);
+                              speakVoice("Flip page back... Look at this wonderful snapshot!");
+                            }}
+                            className="px-3 py-1 bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-30 disabled:cursor-not-allowed font-extrabold rounded-xl text-[10px] transition-all flex items-center gap-1 cursor-pointer shadow-sm font-sans"
+                          >
+                            <ChevronLeft size={12} /> Previous
+                          </button>
+
+                          <span className="font-black text-amber-900 select-none text-[10.5px]">
+                            📖 Page {currentScrapbookPage + 1} of {scrapbookEntries.length}
+                          </span>
+
+                          <button
+                            type="button"
+                            disabled={currentScrapbookPage === scrapbookEntries.length - 1}
+                            onClick={() => {
+                              setCurrentScrapbookPage(p => p + 1);
+                              speakVoice("Flip page forward... Oh, check this one out!");
+                            }}
+                            className="px-3 py-1 bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-30 disabled:cursor-not-allowed font-extrabold rounded-xl text-[10px] transition-all flex items-center gap-1 cursor-pointer shadow-sm font-sans"
+                          >
+                            Next <ChevronRight size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* SUBTAB 2: MAGICAL DOODLE CANVAS PAD */}
+                {scrapbookTabActive === "doodle" && (
+                  <div className="space-y-3 bg-pink-50/20 p-4 rounded-3xl border border-pink-100 text-left">
+                    <h3 className="text-pink-855 font-black text-xs flex items-center gap-1">
+                      🎨 Elizabeth's Magical Artwork Studio
+                    </h3>
+                    <p className="text-gray-500 text-[10px] leading-relaxed">
+                      Use your mouse or tablet finger to sketch beautiful doggy doodles or colorful castles! Input a title to snap it into our Keepsake book!
+                    </p>
+
+                    {/* Canvas Stage */}
+                    <div className="flex justify-center">
+                      <canvas
+                        ref={doodleCanvasRef}
+                        width={280}
+                        height={240}
+                        onMouseDown={startDrawing}
+                        onMouseMove={draw}
+                        onMouseUp={stopDrawing}
+                        onMouseLeave={stopDrawing}
+                        onTouchStart={startDrawing}
+                        onTouchMove={draw}
+                        onTouchEnd={stopDrawing}
+                        className="bg-white rounded-2xl border-2 border-pink-200 shadow-md cursor-crosshair touch-none"
+                      />
+                    </div>
+
+                    {/* Paint Tools & Palettes */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-[10.5px]">
+                        <span className="text-pink-900 font-extrabold flex items-center gap-1">🎨 Paint Color:</span>
+                        <button
+                          type="button"
+                          onClick={clearDoodleCanvas}
+                          className="px-2 py-0.5 bg-gray-200 hover:bg-red-100 hover:text-red-700 text-gray-700 font-extrabold text-[9px] rounded-lg transition-transform active:scale-95 cursor-pointer border border-gray-300"
+                        >
+                          🧹 Clear Canvas
+                        </button>
+                      </div>
+
+                      {/* Bullet circle color buttons */}
+                      <div className="flex gap-2 justify-center pb-1">
+                        {[
+                          { color: "#ec4899", label: "Princess pink" },
+                          { color: "#f59e0b", label: "Gold honey" },
+                          { color: "#0ea5e9", label: "Sky breeze" },
+                          { color: "#10b981", label: "Clover meadow" },
+                          { color: "#1e293b", label: "Doggy dark" },
+                          { color: "#ffffff", label: "Eraser 🧹" }
+                        ].map(c => (
+                          <button
+                            key={c.color}
+                            type="button"
+                            onClick={() => {
+                              setDoodleColor(c.color);
+                              speakVoice(c.color === "#ffffff" ? "Eraser turned on! Rub off any spots!" : `Selected paint color: ${c.label}! Sketch wonderfully!`);
+                            }}
+                            className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${doodleColor === c.color ? 'border-pink-600 scale-110 shadow-sm' : 'border-gray-200 hover:scale-105'}`}
+                            style={{ backgroundColor: c.color }}
+                            title={c.label}
+                          >
+                            {c.color === "#ffffff" && "🧽"}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Brush width Slider slider decoration */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center text-[10.5px] text-gray-500">
+                          <span>Brush Stroke Thickness:</span>
+                          <span className="font-extrabold text-pink-700">{doodleLineWidth}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="2"
+                          max="20"
+                          value={doodleLineWidth}
+                          onChange={(e) => setDoodleLineWidth(Number(e.target.value))}
+                          className="w-full accent-pink-500 h-1.5 bg-gray-200 rounded-lg cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Metadata Save Fields */}
+                    <div className="space-y-2 border-t border-pink-100 pt-2.5 text-xs text-left">
+                      <div>
+                        <label className="text-pink-900 font-extrabold block mb-0.5 text-[10px]">🎨 Artwork Title:</label>
+                        <input
+                          type="text"
+                          placeholder="My Princess Liz 👑"
+                          value={newMemoryTitle}
+                          onChange={(e) => setNewMemoryTitle(e.target.value)}
+                          className="w-full bg-white border border-pink-200 text-[10.5px] py-1.5 px-2.5 rounded-lg font-bold text-gray-750 font-sans cursor-pointer focus:outline-none focus:border-pink-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-pink-900 font-extrabold block mb-0.5 text-[10px]">🌸 Describe Your Painting:</label>
+                        <textarea
+                          placeholder="What is happening in this cozy master artwork..."
+                          value={newMemoryCaption}
+                          onChange={(e) => setNewMemoryCaption(e.target.value)}
+                          rows={2}
+                          className="w-full bg-white border border-pink-200 text-[10.5px] py-1.5 px-2.5 rounded-lg font-bold text-gray-750 font-sans cursor-pointer focus:outline-none focus:border-pink-400 resize-none"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const canvas = doodleCanvasRef.current;
+                          if (!canvas) return;
+                          
+                          const dataUrl = canvas.toDataURL("image/png");
+                          const finalTitle = newMemoryTitle.trim() || "My Magical Painting 🎨";
+                          const finalCaption = newMemoryCaption.trim() || "Elizabeth painted a sweet gorgeous artwork directly in our cottage paint studio! Spectacular!";
+                          
+                          addMemoryToScrapbook(
+                            finalTitle,
+                            "drawing",
+                            finalCaption,
+                            "🎨🌸",
+                            "from-pink-50 via-teal-50 to-emerald-100",
+                            dataUrl
+                          );
+
+                          // Reset states
+                          setNewMemoryTitle("");
+                          setNewMemoryCaption("");
+                          clearDoodleCanvas();
+                          setScrapbookTabActive("book");
+                          setCurrentScrapbookPage(0); // display top memory page
+
+                          addActivityLog("game", `Painted visual artwork: ${finalTitle}`);
+                          speakVoice(`*cheers loudly* That is a true masterpiece, Elizabeth! I have safely tucked your painting right into page one of our Magical Memory Book! Tap to look at it!`);
+                        }}
+                        className="w-full py-2.5 bg-pink-500 hover:bg-pink-600 text-white font-extrabold rounded-xl text-xs shadow-[0_3px_0_#be185d] active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer mt-1 font-sans"
+                      >
+                        📂 Save Painting To Cozy Scrapbook! 🐾✨
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* SUBTAB 3: LOG A REAL/CUSTOM MILESTONE DIARY */}
+                {scrapbookTabActive === "parent" && (
+                  <div className="space-y-3 bg-rose-50/20 p-4 rounded-3xl border border-rose-100 text-left">
+                    <h3 className="text-rose-800 font-black text-xs flex items-center gap-1">
+                      ✍️ Log a Childhood Deed or Milestone Event
+                    </h3>
+                    <p className="text-gray-500 text-[10px] leading-relaxed">
+                      Elizabeth or parents can type down beautiful real-world accomplishments (like tidying up toys, reading to teddy, or saying nice greetings) to frame custom puppy polaroids!
+                    </p>
+
+                    <div className="space-y-3 text-[10.5px]">
+                      {/* Milestone title */}
+                      <div>
+                        <label className="text-rose-900 font-extrabold block mb-0.5">🌟 Milestone Title:</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Cleared my playroom! 🧸"
+                          value={newMemoryTitle}
+                          onChange={(e) => setNewMemoryTitle(e.target.value)}
+                          className="w-full bg-white border border-rose-200 text-[10.5px] py-1.5 px-2.5 rounded-lg font-bold text-gray-750 focus:outline-none focus:border-rose-450"
+                        />
+                      </div>
+
+                      {/* Milestone description */}
+                      <div>
+                        <label className="text-rose-900 font-extrabold block mb-0.5">📝 Childhood Diary Entry:</label>
+                        <textarea
+                          placeholder="Explain what brave, kind, or helpful action you achieved today..."
+                          value={newMemoryCaption}
+                          onChange={(e) => setNewMemoryCaption(e.target.value)}
+                          rows={3}
+                          className="w-full bg-white border border-rose-200 text-[10.5px] py-1.5 px-2.5 rounded-lg font-bold text-gray-750 focus:outline-none focus:border-rose-450 resize-none"
+                        />
+                      </div>
+
+                      {/* Emoji Selector list */}
+                      <div>
+                        <span className="text-rose-900 font-extrabold block mb-1">Pick a snapshot icon cover:</span>
+                        <div className="flex gap-2 justify-center flex-wrap bg-white/60 p-2 rounded-xl border border-rose-100">
+                          {["🌸", "⭐", "🧁", "👑", "🐶", "💖", "🧸", "🎈", "☀️", "🌈", "🍦", "🌙", "🦋"].map(em => (
+                            <button
+                              key={em}
+                              type="button"
+                              onClick={() => {
+                                setNewMemoryEmoji(em);
+                                speakVoice(`Cover badge selected: ${em}!`);
+                              }}
+                              className={`text-2xl p-1 bg-white border rounded-xl hover:scale-110 active:scale-95 transition-transform cursor-pointer ${newMemoryEmoji === em ? 'border-rose-500 bg-rose-50 shadow-inner' : 'border-gray-200'}`}
+                            >
+                              {em}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Background styled choices */}
+                      <div>
+                        <span className="text-rose-900 font-extrabold block mb-1">🌟 Pastel Album Wall Color:</span>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[
+                            { bg: "from-pink-50 via-rose-50 to-pink-100", label: "Rosy Pink", col: "bg-pink-100 border-pink-300" },
+                            { bg: "from-amber-50 via-yellow-50 to-yellow-101", label: "Sunshine", col: "bg-yellow-105 border-yellow-300" },
+                            { bg: "from-sky-50 via-blue-50 to-sky-100", label: "Ocean Breeze", col: "bg-sky-100 border-sky-300" },
+                            { bg: "from-violet-50 via-purple-50 to-indigo-100", label: "Lavender Wizard", col: "bg-purple-100 border-purple-300" }
+                          ].map(bgOpt => (
+                            <button
+                              key={bgOpt.bg}
+                              type="button"
+                              onClick={() => setNewMemoryBg(bgOpt.bg)}
+                              className={`py-1 border rounded-lg hover:scale-103 cursor-pointer text-[9.5px] font-extrabold ${bgOpt.col} ${newMemoryBg === bgOpt.bg ? 'border-rose-500 scale-102 ring-2 ring-rose-250 font-black' : ''}`}
+                            >
+                              {bgOpt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const finalTitle = newMemoryTitle.trim() || "Kind Activity log! ⭐";
+                          const finalCaption = newMemoryCaption.trim() || "Elizabeth achieved a sweet helpful deed around the playroom! Liz gave extra high-paws!";
+
+                          addMemoryToScrapbook(
+                            finalTitle,
+                            "kindness",
+                            finalCaption,
+                            newMemoryEmoji,
+                            newMemoryBg
+                          );
+
+                          // reset states
+                          setNewMemoryTitle("");
+                          setNewMemoryCaption("");
+                          setScrapbookTabActive("book");
+                          setCurrentScrapbookPage(0); // display top memory page
+                          
+                          addActivityLog("mission", `Logged sweet milestone: ${finalTitle}`);
+                          speakVoice(`Paws up! That is so beautiful, Elizabeth! I have framed your shiny milestone card directly into our Memory Book scrapbook! Let's read it together!`);
+                        }}
+                        className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-extrabold rounded-xl text-xs shadow-[0_3px_0_#9f1239] active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 font-sans"
+                      >
+                        📸 Frame Polaroid Snapshot & Save! 🐾🌸
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* DOCK LAUNCHERS (PRIMARY VIEW GRID OF THEME) */}
             <div id="playground-dock-action-grid" className="grid grid-cols-2 gap-4 w-full relative z-10">
               
@@ -2571,6 +3278,20 @@ export default function App() {
               >
                 <span className="text-3xl">👥✨</span>
                 <span className="fredoka">My Puppy Friends Club</span>
+              </button>
+
+              {/* Scrapbook action card */}
+              <button
+                id="tab-trigger-scrapbook"
+                onClick={() => {
+                  setActiveTab("scrapbook");
+                  setLizExpression("excited");
+                  speakVoice("Open Sesame! Welcome to our magical Childhood Memory Scrapbook, Elizabeth! Tap to flip through all our drawing masterworks, stories, and cookies!");
+                }}
+                className="col-span-2 bg-gradient-to-r from-amber-400 via-rose-400 to-violet-400 hover:from-amber-500 hover:to-violet-500 text-white py-3.5 px-5 rounded-[28px] font-black text-md md:text-lg shadow-[0_8px_0_#be185d] flex items-center justify-center gap-3 active:translate-y-1 active:shadow-none transition-all cursor-pointer"
+              >
+                <span className="text-3xl">🎨📖</span>
+                <span className="fredoka">Liz's Magical Memory Book</span>
               </button>
 
             </div>
